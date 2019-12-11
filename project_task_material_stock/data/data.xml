@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <data>
+    <data noupdate="1">
         <!-- Sequence new picking type -->
         <record model="ir.sequence" id="project_task_material_sequence">
             <field name="name">Project Task Material Sequence</field>
@@ -20,5 +20,10 @@
             <field name="default_location_src_id" ref="stock.stock_location_stock"/>
             <field name="default_location_dest_id" ref="stock.stock_location_customers"/>
         </record>
+
+        <record model="stock.warehouse" id="stock.warehouse0">
+            <field name="out_task_id" ref="project_task_material_stock.project_task_material_picking_type"/>
+        </record>
+
     </data>
 </odoo>
