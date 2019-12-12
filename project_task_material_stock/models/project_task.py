@@ -2,6 +2,10 @@
 # Copyright 2015 Tecnativa - Carlos Dauden
 # Copyright 2016-2017 Tecnativa - Vicent Cubells
 # License AGPL-3 - See http://www.gnu.org/licenses/agpl-3.0.html
+
+# flake8: noqa:
+# pylama: ignore=E501
+
 from odoo import _, api, exceptions, fields, models
 
 
@@ -161,8 +165,39 @@ class ProjectTaskMaterial(models.Model):
         return {'domain': {'product_uom_id': [
             ('category_id', '=', self.product_id.uom_id.category_id.id)]}}
 
+    def get_picking_type(self):
+        self.ensure_one()
+        location = self.task_id.location_source_id or \
+            self.task_id.project_id.location_source_id or \
+            self.env.ref('stock.stock_location_stock')
+        return location.get_warehouse().out_task_id or \
+            self.env.ref('project_task_material_stock.project_task_material_picking_type')
+
+    def get_default_source_location(self):
+        self.ensure_one()
+        return self.task_id.location_source_id or \
+            self.task_id.project_id.location_source_id or \
+            self.env.ref('stock.stock_location_stock')
+
+    def get_default_dest_location(self):
+        self.ensure_one()
+        return self.task_id.location_dest_id or \
+            self.task_id.project_id.location_dest_id or \
+            self.env.ref('stock.stock_location_customers')
+
     def _prepare_stock_move(self):
+        self.ensure_one()
         product = self.product_id
+        analytic_account = getattr(self.task_id, 'analytic_account_id', False) \
+            or self.task_id.project_id.analytic_account_id
+
+        task_tags = getattr(self.task_id, 'analytic_tag_ids', False)
+        proj_tags = getattr(self.task_id.project_id, 'analytic_tag_ids', False)
+        tag_ids = set(task_tags.ids if task_tags else [] + proj_tags.ids if proj_tags else [])
+        dep = self.task_id.project_department_id
+        if dep and dep.expense_account_id:
+            tag_ids.add(self.env['account.analytic.tag'].search([('department_id', '=', dep.id)], limit=1).id)
+
         res = {
             'product_id': product.id,
             'name': product.partner_ref,
@@ -170,29 +205,24 @@ class ProjectTaskMaterial(models.Model):
             'product_uom': self.product_uom_id.id or product.uom_id.id,
             'product_uom_qty': self.quantity,
             'origin': self.task_id.name,
-            'location_id':
-                self.task_id.location_source_id.id or
-                self.task_id.project_id.location_source_id.id or
-                self.env.ref('stock.stock_location_stock').id,
-            'location_dest_id':
-                self.task_id.location_dest_id.id or
-                self.task_id.project_id.location_dest_id.id or
-                self.env.ref('stock.stock_location_customers').id,
+            'location_id': self.get_default_source_location().id,
+            'location_dest_id': self.get_default_dest_location().id,
+            'analytic_account_id': analytic_account.id,
+            'analytic_tag_ids': [(6, 0, list(tag_ids))],
         }
         return res
 
     @api.multi
     def create_stock_move(self):
-        pick_type = self.env.ref(
-            'project_task_material_stock.project_task_material_picking_type')
-
-        task = self[0].task_id
+        me = self[0]
+        task = me.task_id
+        pick_type = me.get_picking_type()
         picking_id = task.picking_id or self.env['stock.picking'].create({
             'origin': "{}/{}".format(task.project_id.name, task.name),
             'partner_id': task.partner_id.id,
             'picking_type_id': pick_type.id,
             'location_id': pick_type.default_location_src_id.id,
-            'location_dest_id': pick_type.default_location_dest_id.id,
+            'location_dest_id': pick_type.default_location_dest_id.id or me.get_default_dest_location().id,
         })
 
         for line in self:
