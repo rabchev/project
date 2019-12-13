@@ -20,3 +20,7 @@ class ProjectProject(models.Model):
         index=True,
         help='Default location to which materials are consumed.',
     )
+    analytic_tag_ids = fields.Many2many(
+        'account.analytic.tag',
+        string='Analytic Tags'
+    )

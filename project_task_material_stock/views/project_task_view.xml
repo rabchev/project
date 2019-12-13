@@ -19,7 +19,11 @@
         <field name="arch" type="xml">
             <field name="project_id" position="after">
                 <field name="analytic_account_id" groups="analytic.group_analytic_accounting"
-                       attrs="{'required': [('project_id', '=', False)]}"/>
+                    attrs="{'required': [('project_id', '=', False)]}"/>
+                <field name="analytic_tag_ids"
+                    groups="analytic.group_analytic_accounting"
+                    widget="many2many_tags"
+                    options="{'color_field': 'color'}"/>
             </field>
             <field name="stage_id" position="before">
                 <button name="action_assign" type="object"

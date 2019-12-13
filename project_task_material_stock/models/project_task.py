@@ -59,6 +59,10 @@ class Task(models.Model):
         string='Analytic Account',
         help='Move created will be assigned to this analytic account',
     )
+    analytic_tag_ids = fields.Many2many(
+        'account.analytic.tag',
+        string='Analytic Tags'
+    )
     analytic_line_ids = fields.Many2many(
         comodel_name='account.analytic.line',
         compute='_compute_analytic_line',
@@ -191,9 +195,7 @@ class ProjectTaskMaterial(models.Model):
         analytic_account = getattr(self.task_id, 'analytic_account_id', False) \
             or self.task_id.project_id.analytic_account_id
 
-        task_tags = getattr(self.task_id, 'analytic_tag_ids', False)
-        proj_tags = getattr(self.task_id.project_id, 'analytic_tag_ids', False)
-        tag_ids = set(task_tags.ids if task_tags else [] + proj_tags.ids if proj_tags else [])
+        tag_ids = set(self.task_id.analytic_tag_ids.ids + self.task_id.project_id.analytic_tag_ids.ids)
         dep = self.task_id.project_department_id
         if dep and dep.expense_account_id:
             tag_ids.add(self.env['account.analytic.tag'].search([('department_id', '=', dep.id)], limit=1).id)
